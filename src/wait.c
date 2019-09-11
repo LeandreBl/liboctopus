@@ -8,15 +8,20 @@ static int process_fd(octopus_t *poll, long timeout)
 	lvector_reserve(poll->epoll_events, clist_size(poll->fd_events));
 	if (pthread_mutex_lock(&poll->fd_events_mutex) == -1)
 		return -1;
-	count = epoll_wait(poll->epollfd, poll->epoll_events.arr, poll->epoll_events.rsize, timeout);
+	count = epoll_wait(poll->epollfd, poll->epoll_events.arr,
+			   poll->epoll_events.rsize, timeout);
 	if (count < 0)
 		return -1;
 	poll->epoll_events.size = (size_t)count;
 	lvector_foreach(event, poll->epoll_events)
 	{
 		p = event->data.ptr;
-		if (event->events == p->on_event)
-			p->callback(poll, p->fd, p->userdata);
+		if (event->events == p->on_event) {
+			if (p->cbs.on_trigger != NULL)
+				p->cbs.on_trigger(poll, p);
+			if (p->callback != NULL)
+				p->callback(poll, p->fd, p->userdata);
+		}
 	}
 	if (pthread_mutex_unlock(&poll->fd_events_mutex) == -1)
 		return -1;
@@ -41,7 +46,12 @@ static int process_event(octopus_t *poll)
 		if (move_all_to_add(poll) == -1)
 			return -1;
 		while (poll->events != NULL) {
-			poll->events->object.callback(poll, poll->events->object.userdata);
+			if (poll->events->object.cbs.on_trigger != NULL)
+				poll->events->object.cbs.on_trigger(
+					poll, &poll->events->object);
+			if (poll->events->object.callback != NULL)
+				poll->events->object.callback(
+					poll, poll->events->object.userdata);
 			clist_erase(poll->events, poll->events);
 		}
 	} while (poll->events != NULL);

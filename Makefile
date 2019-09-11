@@ -5,6 +5,7 @@ CC		= gcc
 ARCHIVER	= ar
 
 SRCS		= src/create.c
+SRCS		+= src/delayed_event.c
 SRCS		+= src/add_event.c
 SRCS		+= src/monitor.c
 SRCS		+= src/wait.c
